@@ -93,3 +93,25 @@ Both adjustments stay inside the new test file. I didn't change
 I also had to install `pytest` into my local venv, which is not a repo
 change. The posted plan's intent didn't change, so I haven't posted a
 follow-up comment on the thread.
+
+### Deviation 3 (Unit 4, before opening the PR): the test no longer uses aiosqlite
+
+Running the repo's own checks before opening the PR turned up two problems
+with the test as committed in Unit 3:
+
+1. `aiosqlite` is not a Path Review dependency (`pyproject.toml` lists
+   `asyncpg` only). I had installed it into my venv for the repro. CI's
+   `test-unit` job installs `.[dev]` only, so the test would have failed at
+   import there. With `aiosqlite` blocked locally, collection errored.
+2. The test had no `@pytest.mark.unit`, so `make test-unit` (`-m unit`)
+   deselected it.
+
+Commit `fb0a439` replaces the aiosqlite `AsyncSession` with a sync
+SQLAlchemy `Session` on stdlib SQLite (`sqlite://`), wrapped in a small
+awaitable adapter so `health_check` can `await db.execute(...)`. It also drops
+the `DATABASE_URL` override from deviations 1 and 2, which is no longer
+needed now that `asyncpg` comes with the dev install, and adds the `unit`
+marker. That supersedes deviations 1 and 2. The test still fails on unfixed
+`main` (`assert 'unhealthy' == 'healthy'`) and passes on the branch, which
+is the plan's test-plan step 2. The change stays inside the new test file,
+and `api/routes/health.py` is untouched by it.
