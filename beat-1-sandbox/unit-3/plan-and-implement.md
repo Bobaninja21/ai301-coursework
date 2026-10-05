@@ -16,7 +16,7 @@ Bobaninja21
 
 **Plan comment**
 
-PERMALINK_PENDING
+https://github.com/codepath/pathreview-ai301-fa26-s3/issues/61#issuecomment-5989395146
 
 > Plan for this one, built from my repro above (comment 5810627150, at 2f4e82f).
 >
