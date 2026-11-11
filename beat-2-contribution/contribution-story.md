@@ -11,7 +11,7 @@ files and no evidence uploads are part of Assignment 5.
 **Student:** [Student name]
 **GitHub Username:** Bobaninja21
 **Issue:** https://github.com/DarkWorldCoder/market-mirror/issues/164
-**Pull Request:** [GitHub PR link, once opened]
+**Pull Request:** https://github.com/DarkWorldCoder/market-mirror/pull/195
 
 One repository, built across units 5 to 8, telling the whole story of your real
 contribution. Fill it as you work, not at the end — the sections below ask for evidence that
@@ -78,8 +78,13 @@ is the Microsoft Store stub (I point the hook at `python -X utf8` instead), and
 `subprocess.run(["claude", ...])` cannot find npm's `claude.cmd`, so I patched one line to
 `shutil.which("claude")`. It then failed closed with "claude exited 1": the `claude` CLI's
 OAuth token had expired. The guard log shows the wiring test stopped (`stop: no body the guard
-can read | target: gh issue comment --help`) but no real pass yet, so a guarded check of the
-edited claim is still pending a re-login. Repo memory: `CLAUDE.local.md` in my market-mirror
+can read | target: gh issue comment --help`) and nothing real until I logged in again. When it
+finally ran (2026-11-10 23:28), it **stopped my edited claim** on "Promise only the next thing I
+will look at", because the claim still promised the whole table after the first step; repro-check
+had passed that same text. I left the claim as it was, since the PR now delivers what it promised,
+and my PR description and review reply both went out through the guard with `pass`. The
+unit-6 rubric patch's regression (unit-1 harness, with the same `claude.cmd` fix) scored 20/20.
+Repo memory: `CLAUDE.local.md` in my market-mirror
 clone, 47 lines, kept out of git via `.git/info/exclude`. The repo ships its own `CLAUDE.md`,
 but that file covers operating the product, so my file holds the dev conventions, the
 `providers.py` map, and the Windows baseline (868/34/15, compare failures by name).
@@ -99,10 +104,18 @@ in-session as a dry run, my pr-precheck rejected on `standards-met` for the miss
 heading and checklist; I fixed the draft. What remains: a real gate pass after `claude` login,
 then the PR from my fork.
 
-**Unit 8: [one line on the tool work]**
+**Unit 8 (2026-11-11): PR-monitor and playbook; a bot review in the first minute, a draft I rewrote**
 
-[2-4 sentences: the PR-monitor and your playbook. What it read, what it
-drafted, what you did with the draft.]
+I installed the PR-monitor with the same Windows patches as the gate. One of them first failed
+with `NameError: name 'shutil' is not defined`, because the file's CRLF line endings made my
+`import subprocess\n` match miss. I wrote my playbook with a 5-quiet-day nudge threshold, from the
+7 latest outside-contributor PRs here, which merged in 0.1 to 2.3 days. Seconds after PR #195
+opened, `--state` said `FEEDBACK-IN`, but the comment was CodeRabbit's placeholder, not a review:
+the monitor counts a bot as feedback. Once the review landed (7 findings), the full run drafted
+a reply in my playbook's order. It was written as if every fix were already done, and it cited a
+Google Cloud DPA URL that was not the one Google's Gemini terms link. I rewrote it from what I
+actually verified and fixed (5 taken in `cd9d36b`, 2 declined with reasons) and posted it through
+the voice-guard hook (`[hook] pass`). The monitor now reads `QUIET`, with 2 checks passing.
 
 ---
 
@@ -351,6 +364,19 @@ Deviations (recorded 2026-11-10 while building, commit `841265b`):
    without a link.
 3. **Step 3's test allows `""` for `multi` as well as `compatible`.** A multi-provider pool has
    no single vendor; its members' rows apply. Found while filling the dict; stated in the PR.
+4. **Review round 1 (CodeRabbit, 2026-11-11) partly reverses deviation 1.** `mm.sh gateway start`
+   (line 208) strips `MARKET_MIRROR_PROVIDER` and writes `LLM_GATEWAY`, so with deviation 1 alone
+   every login-gateway user got no privacy link. `check()` now falls back to `LLM_GATEWAY` through
+   an explicit `GATEWAY_CATALOG_KEY` map (`gemini` -> `gemini_cli`, `multi` unmapped), which keeps
+   the collision deviation 1 was avoiding. New test:
+   `test_provider_check_maps_login_gateways_to_their_catalog_entry` (fails with `KeyError: 'privacy'`
+   without the fix). Commit `cd9d36b`.
+5. **Review round 1, docs:** four table corrections, each re-read on the provider's own page
+   2026-11-11: the Gemini paid-tier DPA (`business.safety.google/processorterms/`, which my "Not
+   stated" had missed) and a new unpaid-tier row; Together's passthrough models; Qwen's storage
+   region vs inference deployment scope; Claude Code's safety-review training exception.
+   Declined with reasons: an "endpoint differs from catalog" label (new behaviour, not in #164) and
+   CodeRabbit's docstring-coverage threshold (not a check this repo states).
 
 **Toolkit**
 
@@ -395,6 +421,11 @@ Deviations (recorded 2026-11-10 while building, commit `841265b`):
    `tests/test_anthropic_camel.py::test_social_action_and_interview_are_cached`, turned out to be
    flaky on main: it failed 5 of 6 runs at `2ffb39f` and 6 of 6 on the branch, and it does not
    touch `providers.py`. My baseline had caught one of its rare passes. Reported in the PR as such.
+   After review round 1 (`cd9d36b`, 2026-11-11): provider tests **7 passed, 5 failed** (3 new
+   tests pass; the gateway test fails with `KeyError: 'privacy'` when I stash only the fix), full
+   suite **870 passed, 35 failed, 15 skipped**, which is exactly 868 + 3 new − 1 flaky, with the
+   same 34 failures by name plus the same flake. One run before that died at collection with a
+   Windows `0xc000001d` "Illegal instruction" while importing torch; the rerun completed.
 4. Links: all 44 in the table resolve; 41 return 200 to curl, and 3 (openai.com DPA, x.ai DPA,
    OpenAI help article) return 403 to scripts but loaded in a browser.
 5. Also run: CI's syntax lint (`ruff check --select E9,F63,F7,F82 ...`, all checks passed) and
@@ -465,11 +496,24 @@ dry run instead. It rejected on `standards-met`: the repo ships `.github/pull_re
 checklist. Fixed; the dry-run re-grade is accept. Not shipped: the real gate pass and the PR wait
 on the `claude` and `gh` logins.
 
+**2026-11-10/11: shipping through the gate, then review round 1**
+
+The first real gate run blocked on `diff-matches-plan [unclear]: plan.md absent`; I wrote
+`plan.md` at the clone root and it passed. My first `gh pr create` was then stopped by the gate
+*hook*, which judged `codepath/ai301-unit5-starter`: the hook reads the session's working
+directory, not a `cd` inside the command. I moved the session into the clone, and the PR went out
+through both hooks as https://github.com/DarkWorldCoder/market-mirror/pull/195 (voice-guard
+`[hook] pass`, gate pass on the same package). CodeRabbit reviewed within minutes. Decision: verify
+each of its 7 findings against the code and the providers' pages before touching anything. It was
+right about the gateway gap, and about the Gemini DPA I had marked "not stated"; it asked for two
+things outside #164, which I declined. Fixed in `cd9d36b`, re-gated (pass), updated the PR body,
+and replied through the guard.
+
 **Toolkit**
 
 - Tool: Claude Code for the commands, and this log written as I worked.
 - What it produced: dated entries tied to each decision: selection, baseline, claim correction,
-  research split, gate run.
+  research split, gate run, the ship and review round 1.
 - Difficulties: none met with the log itself; the difficulties were in the work it records.
 - What changed: nothing.
 
@@ -477,27 +521,56 @@ on the `claude` and `gh` logins.
 
 ## Pull Request
 
-**PR Link:** [GitHub PR URL when opened]
+**PR Link:** https://github.com/DarkWorldCoder/market-mirror/pull/195 (opened 2026-11-10 23:52
+PT from `Bobaninja21:docs/provider-privacy-164` against `main`)
 
-**PR Description:** [what the PR says; much of the content above
-adapts into it]
+**PR Description:** The title is "Add provider privacy links to provider check and a provider
+data handling table (#164)". The description opens with `Fixes #164` and follows the repo's
+`.github/pull_request_template.md`:
+- **What this changes:** per file, including the `GATEWAY_CATALOG_KEY` map and why `gemini`
+  maps to `gemini_cli`, and a note on where I put the table, since the maintainer never answered.
+- **Why:** teams under GDPR need per-provider retention, DPA, region and training facts.
+- **How I tested it:** the template's 3-item checklist (pytest run, docs updated, dashboard n/a),
+  the before/after output of both reproduction commands, then ruff, the manifest test, provider
+  tests (7 passed / 5 failed, the same 5 as on main) and the full suite (main 868/34/15, branch
+  870/35/15, the extra being the named flaky test), plus what I could not run (Linux, Playwright).
+- **AI assistance:** says Claude Code wrote the code, tests and table, researched the pages and
+  ran the commands, and that I'm responsible for it.
+
+After review round 1, I updated it to describe `cd9d36b` and list what I declined.
 
 **Maintainer Feedback:**
 
-- [Date]: [feedback received, or "none yet"; silence is a normal
-  state and costs you nothing]
-- [Date]: [how you addressed it]
+- 2026-11-10 23:53 PT: CodeRabbit (the repo's AI review bot, not a maintainer) posted a summary,
+  then a review with 7 actionable findings: login gateways get no privacy link because
+  `mm.sh gateway start` drops `MARKET_MIRROR_PROVIDER`; an "endpoint differs" label; the Claude
+  Code safety-review exception; Together passthrough models; a Gemini unpaid-tier row; the Gemini
+  paid-tier DPA; and Qwen region vs inference scope. It also flagged docstring coverage.
+- 2026-11-11 00:23 PT: I verified each finding against `mm.sh` and the providers' pages and fixed
+  5 in `cd9d36b`, with a new gateway test that fails with `KeyError: 'privacy'` without the fix. I
+  declined 2 with one reason each (the endpoint label is beyond #164; docstring coverage is not a
+  check this repo states), and replied in the thread:
+  https://github.com/DarkWorldCoder/market-mirror/pull/195#issuecomment-6790911677
+- 2026-11-11: no human maintainer has commented yet. Checks: CodeRabbit and GitGuardian Security
+  Checks both pass. Silence so far is under my 5-quiet-day threshold, so no nudge.
 
-**Status:** [Awaiting review / Iterating / Merged / Closed. The
-status is a fact you record, never a grade: the PR is graded as
-opened.]
+**Status:** Awaiting maintainer review (open, mergeable, 2 checks passing; 2026-11-11).
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: the ship-gate (my manifest + my pr-precheck) on the real branch and at the `gh pr create`
+  door; the voice-guard hook on the PR and the reply; then the PR-monitor with my playbook.
+- What it produced: gate runs blocked on `plan.md absent`, then passed; the hook stopped my
+  first `gh pr create` (wrong repo), then passed PR #195; the monitor read `FEEDBACK-IN`, drafted a
+  7-point review reply, and now reads `QUIET` with 2 checks passing.
+- Difficulties: the gate hook judges the session's working directory, so a `cd` in the command
+  sent it to the wrong repo. The monitor counted CodeRabbit's placeholder comment as review
+  feedback. Its draft claimed fixes not yet made and cited a Google Cloud DPA URL that Google's
+  Gemini terms do not link.
+- What changed: I moved the session into the clone before shipping. I treated the monitor's draft
+  as a checklist, not a reply: I verified each point, fixed 5, declined 2, and rewrote the reply
+  from what actually happened. I would add a "bot vs human" distinction to the monitor's
+  FEEDBACK-IN state.
 
 ---
 
@@ -505,25 +578,64 @@ opened.]
 
 **Technical Skills Gained**
 
-[What you learned technically, named concretely.]
+- Reading a stranger's config flow end to end before touching it: tracing `write_config` →
+  `.env` → `check()` is what showed me `MARKET_MIRROR_PROVIDER` already held the catalog key, and
+  that the `LLM_GATEWAY` fallback I had planned would have mapped the Gemini CLI to the Gemini
+  API's privacy page (deviation 1).
+- Testing on a red baseline: comparing `FAILED` lines by name instead of trusting a green/red
+  summary, and re-running a suspect test 6 times on each side before calling it flaky
+  (`test_social_action_and_interview_are_cached`: 5/6 failures on main).
+- Writing tests that exercise the change without the platform-broken path: `check(settings=...)`
+  with a fake opener avoids `write_config`, whose `os.replace` on an open temp file fails on
+  Windows (WinError 32).
+- Making Python tools portable to Windows: `shutil.which("claude")` for npm's `.cmd` shims,
+  explicit UTF-8 decoding instead of cp1252, `python -X utf8` instead of the `python3` Store stub,
+  and cmd.exe syntax for anything run with `shell=True`.
 
 **Challenges Overcome**
 
-[What was hard and how you solved it; point at the real events, the
-Toolkit blocks above are full of them.]
+- **My own claim broke my own voice guide.** "I'm aiming to open a PR within about a week"
+  went up unguarded on 2026-11-10. repro-check caught it (`claim-is-specific`: fail), and I edited
+  the claim. Then the voice-guard, once it could run, stopped the *edited* claim too, on "Promise
+  only the next thing I will look at", because it still promised the whole table. Two tools
+  reading one rule differently taught me the guide's wording, not the tool, is where the fix goes.
+- **The gate blocked a good branch for a real reason.** Its first real run on
+  `docs/provider-privacy-164` passed all four manifest checks, then pr-precheck returned
+  `diff-matches-plan [unclear]: plan.md absent`. My plan lived only in this story. I wrote
+  `plan.md` beside the code from the story's plan and deviations, and the next run passed.
+- **Every course tool assumed macOS/Linux.** The voice-guard, the ship-gate, the unit-1 harness
+  and the PR-monitor all failed on Windows the same way (`claude` not found, then cp1252
+  decoding). The test suite killed itself on a SIGTERM test, and WSL's disk went read-only. Each
+  workaround is recorded in the Toolkit thread where it happened.
+- **Research I could not do from memory.** 16 hosted rows × 6 columns of legal-ish facts. I split
+  it across three research agents with one rule (a quote from the provider's own page, or "not
+  stated"), then checked every link: 41 return 200, and the three that block scripts (openai.com
+  DPA, x.ai DPA, OpenAI help) I opened in a browser.
 
 **What I'd Do Differently Next Time**
 
-[Reflection on your process.]
+- Run every outgoing comment through the guard *before* posting, including the first one. The
+  claim that broke my rules is the one I posted before the guard existed.
+- Run the baseline suite twice before building, and mark anything that flips as flaky up front.
+  One baseline run gave me a wrong "new failure" to explain later.
+- Ask the location question in the claim *and* decide a default in the plan, as I eventually
+  did. The maintainer never answered, and the plan already had to choose.
+- Write `plan.md` at the clone root from day one rather than only in the story. The gate reads
+  the clone, not my course repo.
 
 ---
 
 ## Resources Used
 
-[What actually helped, not a reading list. List things this story
-already shows you using: the doc you followed to set the environment
-up, the thread that explained the bug, the person who answered you.
-One real entry beats ten plausible ones.]
-
-- [Link to documentation that helped]
-- [Discussion, issue, or post that helped]
+- market-mirror's `CONTRIBUTING.md` (setup commands, "A PR needs green tests, updated docs") and
+  `.github/workflows/tests.yml` (the ruff and manifest checks my ship manifest mined), plus
+  `.github/pull_request_template.md`, which my pr-precheck caught me ignoring.
+- The issue itself, https://github.com/DarkWorldCoder/market-mirror/issues/164, for the column
+  list and the "facts only from the providers' own pages" rule.
+- The providers' own pages linked in the table's Source column, e.g. OpenAI's
+  https://developers.openai.com/api/docs/guides/your-data and Groq's
+  https://console.groq.com/docs/your-data, which settled the retention and training cells.
+- My own toolkit: issue-scout (scans 1-2), repro-check, the voice-guard, the ship-gate wrapping
+  pr-precheck, and the PR-monitor, each with its log on my machine.
+- Claude Code (Anthropic), the AI assistant that did much of the reading, coding and research
+  with me, as disclosed in the PR.
