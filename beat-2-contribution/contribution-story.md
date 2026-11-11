@@ -1,4 +1,4 @@
-# Contribution: [Issue Title]
+# Contribution: Document what each LLM provider retains and where
 
 Path: `beat-2-contribution/contribution-story.md`
 
@@ -7,11 +7,10 @@ the repository is not read. **Keep every section header below under its exact na
 format criteria grade exactly that. Your course repo link is the whole submission: no tool
 files and no evidence uploads are part of Assignment 5.
 
-**Contribution Number:** [1]
+**Contribution Number:** 1
 **Student:** [Student name]
-**GitHub Username:** [your GitHub username, exactly as it appears on your profile - no @, no
-profile URL. Your comments upstream are identified by this name.]
-**Issue:** [GitHub issue link]
+**GitHub Username:** Bobaninja21
+**Issue:** https://github.com/DarkWorldCoder/market-mirror/issues/164
 **Pull Request:** [GitHub PR link, once opened]
 
 One repository, built across units 5 to 8, telling the whole story of your real
@@ -55,10 +54,17 @@ happened; these entries are the toolkit's own timeline.
 All four entries are graded. Keep every heading below, and fill each
 one in the week it belongs to.
 
-**Unit 5: [one line on the tool work]**
+**Unit 5 (2026-11-10): installed issue-scout, wrote the strategy, ran two scans, found a rubric gap**
 
-[2-4 sentences: what you built (the scout, your strategy), what broke
-or fell short, what changed because of it.]
+I installed the scout over my unit-1 skill, carried my fit profile forward with a new
+"where I want to search" sentence, and wrote five `gh search issues` queries, each traced to
+a profile sentence. `gh` was not logged in, so I ran the same queries through the
+unauthenticated REST search API, whose 60-calls/hour limit forced a 15-minute wait mid-grading.
+Scan 1's "fewer comments first" ordering floated issues filed minutes earlier to the top, and
+3 of the 5 already had open PRs with 0 comments, so I patched the strategy to drop issues
+younger than 3 days. Scan 2 then showed my rubric accepting two aws/agent-toolkit-for-aws issues
+whose broken text lives in a different repo; I wrote up a `fix-is-in-this-repo` check as a
+proposed patch, not yet applied.
 
 **Unit 6: [one line on the tool work]**
 
@@ -80,24 +86,46 @@ drafted, what you did with the draft.]
 
 ## Why I Chose This Issue
 
-[1-2 paragraphs in your own words: how you searched, what your scan
-surfaced, what your scout's verdict said, why this issue fits your
-profile, and what you hope to learn. If your scout's verdict on it
-was reject and you chose it anyway, say so here and say why; choosing
-against your own tool silently is what loses points. Close with an
-honest read of the tool itself: where the scout fell short on a real
-wild search and what you changed or would change, or what convinced
-you it held up. **Record the link to your claim comment in this section too.**
-Not claimed yet? Write `claim pending` and today's date where the link goes,
-and add the link the moment your claim lands.]
+I searched with my own issue-scout: five queries built from my fit profile (Python bugs,
+Python LLM/CLI/agent tooling, FastAPI/SQLAlchemy/pytest, Python docs, scoped TypeScript bugs),
+all on `good first issue`, unassigned, open. Scan 1 combined 394 unique results, ranked them,
+and graded the top five: it accepted only openslop/openslop#1220 (a TypeScript prompt fix) and
+rejected the rest, three of them because an open PR already existed (curvine-doc #120, repowise
+#5490/#5493, yasbd-lib #426/#427) and one because its whole body was "Review attack vectors".
+After patching the strategy, scan 2 surfaced this issue at rank 1 from the LLM/CLI/agent query
+(signals: `documentation` label, 0 comments, updated 2026-11-06) and the scout graded it
+**accept**: all six required checks pass (repo pushed 2026-11-10, no AI ban in CONTRIBUTING.md,
+no assignee/comments/linked PRs, opened by the owner with named files and a "Done when" list).
+`maintainer-responsive` came back `unclear` because I skipped that fetch to save API calls.
+
+It fits because it is a Python CLI for LLM providers, the exact kind of tooling I use daily,
+and the change is a docs table plus a small `privacy` field in `CATALOG` in
+`backend/claude_cli/providers.py` with a pytest test, which I can verify locally (the suite mocks
+the model, no API key needed). I picked it over openslop#1220 because verifying that one needs a
+live LLM run. The honest cost: `CATALOG` has about 26 entries, roughly 15 of them hosted APIs whose
+retention, DPA and region terms I have to research from each provider's own pages, so this is
+more reading than coding. I want to learn to land a small, sourced change in someone else's repo.
+
+On the tool: the rubric held up on claims (it caught every open PR), but the ranking misread the
+wild twice. Brand-new issues get claimed by PR within hours, not by comment, so "fewer comments
+first" was rewarding exactly the wrong issues; and the rubric accepted two aws issues whose broken
+README text is generated by a separate CLI, which a search of 99 docs in that repo confirmed.
+I patched the strategy for the first and drafted a rubric check for the second.
+
+Claim comment: https://github.com/DarkWorldCoder/market-mirror/issues/164#issuecomment-6788636938 (posted 2026-11-10).
 
 **Toolkit**
 
-- Tool: issue-scout (your scout: your search strategy, your rubric),
-  and how you used it
-- What it produced: [the scan and its verdict on this issue, described]
-- Difficulties: [where it fell short, or "none met" if none did]
-- What changed: [what you patched or would update, or "nothing"]
+- Tool: issue-scout (my search strategy + my unit-1 rubric), run as two scans on 2026-11-10;
+  queries went through the REST search API because `gh` was not logged in.
+- What it produced: scan 1 graded 5 (1 accept: openslop#1220); scan 2 graded 5 (3 accept),
+  with market-mirror#164 at rank 1, verdict accept, six required checks pass,
+  `maintainer-responsive` unclear.
+- Difficulties: "fewer comments first" ranked minutes-old issues highest, and 3 of 5 were
+  already claimed by open PRs; my `sort=updated` in the API workaround made the 90-day filter
+  a no-op; the rubric accepted aws#543/#541 although their fix lives in another repo.
+- What changed: added a "drop issues created < 3 days ago" filter and went back to best-match
+  order; drafted a `fix-is-in-this-repo` required check (pending a unit-1 harness regression run).
 
 ---
 
