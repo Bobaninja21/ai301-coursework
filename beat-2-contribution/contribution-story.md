@@ -84,10 +84,20 @@ clone, 47 lines, kept out of git via `.git/info/exclude`. The repo ships its own
 but that file covers operating the product, so my file holds the dev conventions, the
 `providers.py` map, and the Windows baseline (868/34/15, compare failures by name).
 
-**Unit 7: [one line on the tool work]**
+**Unit 7 (2026-11-10): ship-gate installed and patched for Windows; manifest written; the gate stopped on login, my pr-precheck caught a missing template**
 
-[2-4 sentences: the ship-gate and your gate manifest. What it produced
-on your real branch, what fought you, what changed because of it.]
+The install ran cleanly but shipped the same two Windows breaks as unit 6's guard (`python3`
+in the hook, `claude` without `.cmd`), plus a third: `git diff` and check output are decoded as
+cp1252, which crashes on the em dashes in this repo's docs. I patched all of them (4 small changes)
+and pointed the hook at `python -X utf8`. My `ship-manifest.md` has 4 must-pass rows written for
+cmd.exe, because the gate runs them with `shell=True` (setup, CI's syntax-only ruff, provider tests
+with the 5 known Windows failures deselected by name, the manifest-version test). It has 3 dated
+exclusions (full suite red on main on Windows, those 5 tests, Playwright tests I can't run). On
+`docs/provider-privacy-164` all four checks passed, then the gate stopped: pr-precheck "could not
+complete its run (claude exited 1 ... 401)". That was a fail-closed refusal, not a judgment. Run
+in-session as a dry run, my pr-precheck rejected on `standards-met` for the missing PR-template
+heading and checklist; I fixed the draft. What remains: a real gate pass after `claude` login,
+then the PR from my fork.
 
 **Unit 8: [one line on the tool work]**
 
@@ -329,7 +339,18 @@ the structure of `CATALOG`; and no legal interpretation in the table: facts and 
 4. Docs: the "Provider data handling" table in `docs/PROVIDERS_AND_SCALE.md` (or `PRIVACY.md`
    if the maintainer prefers), plus a one-line pointer to it from PRIVACY.md:23.
 
-Deviations: none yet (no code written).
+Deviations (recorded 2026-11-10 while building, commit `841265b`):
+
+1. **Step 2 drops the `LLM_GATEWAY` fallback.** `check()` reads only `MARKET_MIRROR_PROVIDER`.
+   Reading `write_config`/`primary_from_pool` showed that gateway names collide with catalog keys:
+   the Gemini CLI gateway writes `LLM_GATEWAY=gemini`, but `CATALOG["gemini"]` is the Gemini
+   **API**, so the fallback would have printed the wrong provider's page.
+2. **Step 1 uses one `PRIVACY_LINKS` dict for all 25 entries**, applied by one loop, instead of
+   inline fields on 13 static entries plus a dict for the 12 `API_GUIDES` ones. One place to
+   update, and `PRIVACY_LINKS[_name]` raises `KeyError` at import if a provider is ever added
+   without a link.
+3. **Step 3's test allows `""` for `multi` as well as `compatible`.** A multi-provider pool has
+   no single vendor; its members' rows apply. Found while filling the dict; stated in the PR.
 
 **Toolkit**
 
@@ -361,15 +382,34 @@ Deviations: none yet (no code written).
 4. **Docs check:** every table row has a source link and a checked-on date; I will open each
    source link once to confirm that it resolves.
 
+**Results on the built change (`841265b`, 2026-11-10):**
+
+1. Repro re-run, after:
+   `have guide: 25 | have privacy: ['ollama', 'lmstudio', 'anthropic', ... 'minimax', 'compatible']`
+   (all 25) and
+   `{"status": "unreachable_or_invalid_response", "inference_tested": false, "privacy": "https://www.anthropic.com/legal/privacy"}`.
+2. Provider tests: **6 passed, 5 failed**. Both new tests pass (they failed before the links
+   existed: 7 failed / 4 passed), and the 5 failures are the same Windows ones.
+3. Full suite: **869 passed, 35 failed, 15 skipped**. My pass condition was *not* met as written
+   (that would be 870/34). All 34 baseline failures are present by name. The one extra,
+   `tests/test_anthropic_camel.py::test_social_action_and_interview_are_cached`, turned out to be
+   flaky on main: it failed 5 of 6 runs at `2ffb39f` and 6 of 6 on the branch, and it does not
+   touch `providers.py`. My baseline had caught one of its rare passes. Reported in the PR as such.
+4. Links: all 44 in the table resolve; 41 return 200 to curl, and 3 (openai.com DPA, x.ai DPA,
+   OpenAI help article) return 403 to scripts but loaded in a browser.
+5. Also run: CI's syntax lint (`ruff check --select E9,F63,F7,F82 ...`, all checks passed) and
+   `tests/test_manifest_versions.py` (OK).
+
 **Toolkit**
 
-- Tool: Claude Code, used to turn the baseline run into before/after numbers and
-  a named-failure diff.
-- What it produced: the 4 checks above with their baseline numbers filled in.
-- Difficulties: on a baseline with 34 red tests, "tests pass" means nothing, so I needed
-  a comparison that a new failure couldn't hide in.
-- What changed: the pass condition is "the same 34 failures by name", not a green suite, and
-  the new tests deliberately avoid `write_config`.
+- Tool: Claude Code, used to turn the baseline run into before/after numbers, run the suite on
+  the branch, and diff the `FAILED` lines by name.
+- What it produced: the 4 checks above with baseline numbers, then the results: one name in the
+  diff (`> FAILED tests/test_anthropic_camel.py::test_social_action_and_interview_are_cached`).
+- Difficulties: the by-name diff flagged a "new" failure that wasn't mine. I only knew that after
+  running it 6 times on each side; a single baseline run had caught a rare pass.
+- What changed: I now treat one baseline run as a sample, not a fact. Next time I would run the
+  baseline twice and mark any test that flips as flaky before building anything.
 
 ---
 
@@ -403,10 +443,33 @@ disclosure goes in the PR. Also applied the unit-6 rubric patch (`scope-feasible
 note) to my scout. Its unit-1 regression run is pending for the same reason as the guard:
 `claude -p` returns 401 until I log in again.
 
+**2026-11-10: research split, then the build**
+
+Decision: the table is research, not code, so I split the 22 providers that have terms of their
+own across three research agents with one rule: a cell is a quote from the provider's own page or
+it says "not stated". That rule produced most of the "not stated" cells (DeepSeek, MiniMax,
+Z.ai training) instead of guesses from memory. Four links returned 403 to every script
+(openai.com, x.ai) and I opened them in a browser before keeping them. No maintainer answer on
+where the table goes, so I used `docs/PROVIDERS_AND_SCALE.md` (the issue's first option) and
+said so in the PR. Built on `docs/provider-privacy-164`. Wrote the tests first and watched them
+fail (7 failed / 4 passed), then added the links. Deviations 1-3 above came out of this step.
+
+**2026-11-10: the ship-gate on the real branch**
+
+Installed the ship-gate, wrote `ship-manifest.md` (4 must-pass checks mined from CONTRIBUTING.md
+and `.github/workflows/tests.yml`, 3 dated exclusions), and ran it by hand. All four repo checks
+passed; then it stopped: "your pr-precheck could not complete its run (claude exited 1: ... 401
+OAuth access token has expired)". Same login as the guard. I ran my pr-precheck in-session as a
+dry run instead. It rejected on `standards-met`: the repo ships `.github/pull_request_template.md`
+("How I tested it" plus a 3-item checklist), and my draft had renamed the heading and dropped the
+checklist. Fixed; the dry-run re-grade is accept. Not shipped: the real gate pass and the PR wait
+on the `claude` and `gh` logins.
+
 **Toolkit**
 
 - Tool: Claude Code for the commands, and this log written as I worked.
-- What it produced: two dated entries tied to the selection and the baseline decisions.
+- What it produced: dated entries tied to each decision: selection, baseline, claim correction,
+  research split, gate run.
 - Difficulties: none met with the log itself; the difficulties were in the work it records.
 - What changed: nothing.
 
