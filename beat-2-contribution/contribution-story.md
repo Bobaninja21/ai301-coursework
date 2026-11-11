@@ -133,26 +133,46 @@ Claim comment: https://github.com/DarkWorldCoder/market-mirror/issues/164#issuec
 
 **Problem Description**
 
-[In your own words, what is broken or missing?]
+MarketMirror sends your briefs and documents to whichever LLM provider you configure, and
+PRIVACY.md (line 23) only says "that provider's own privacy policy and data-retention terms
+apply." Nothing in the repo tells a team, per provider, whether a data processing agreement
+exists, how long prompts are kept, whether zero-retention is available, where data is processed,
+or whether prompts train models by default. Teams under GDPR need exactly that to pick a
+provider, and the CLI that helps you pick one (`providers.py`) has a docs link and a key link per
+provider but no privacy link.
 
 **Expected Behavior**
 
-[What should happen?]
+- The docs carry a "Provider data handling" table with one row per `CATALOG` provider: DPA link,
+  default retention, zero-retention option, processing regions, trains-by-default, a
+  checked-on date and a source link, all from the providers' own pages, with no legal advice.
+- Every `CATALOG` entry has a `privacy` link, and `provider check` shows the configured
+  provider's privacy link, with a test covering it.
 
 **Current Behavior**
 
-[What actually happens?]
+- `providers.py list` returns 25 entries and none has a `privacy` key.
+- `provider check` returns only `status`, models and `inference_tested`, with no privacy link.
+- The only data-handling text in the docs is the one generic sentence in PRIVACY.md:23.
 
 **Affected Components**
 
-[Which parts of the codebase are involved?]
+- `backend/claude_cli/providers.py`: `CATALOG` (13 static entries), `API_GUIDES` (12 hosted
+  APIs merged into `CATALOG` by a loop), and `check()`, which reads the configured provider from
+  `.env` (`MARKET_MIRROR_PROVIDER`, written by `write_config`).
+- `backend/claude_cli/tests/test_providers.py`: existing provider tests.
+- `docs/PROVIDERS_AND_SCALE.md` or `PRIVACY.md` for the table (asked the maintainer which).
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code (AI assistant), used to read the issue body and `providers.py` and to
+  run `providers.py list` to count the entries.
+- What it produced: the issue restated as 3 deliverables, and the finding that `CATALOG` has
+  25 entries (13 static + 12 merged in from `API_GUIDES`), not the "15+" the issue mentions.
+- Difficulties: the issue says "15+ providers", which undersold the research load. Only by
+  running `list` did I see that about 15 are hosted APIs that need real data-terms research.
+- What changed: I put the per-row source and checked-on date into the plan as the main cost,
+  and asked the maintainer where the table should live instead of guessing.
 
 ---
 
@@ -160,31 +180,84 @@ Claim comment: https://github.com/DarkWorldCoder/market-mirror/issues/164#issuec
 
 **Environment Setup**
 
-[What a stranger would need to stand this up: your operating system,
-the relevant versions (language, runtime, package manager, the project
-itself), and how you set the project up. Then the challenges you faced
-and how you solved them, or that none came up.]
+- OS: Windows 11 Pro (10.0.26300), Git Bash and PowerShell 7; git 2.55.
+- Python 3.12.13 (installed by uv for the project; system Python is 3.14), uv 0.13.7
+  (installed with `python -m pip install --user uv`, since uv was not on PATH).
+- Project: DarkWorldCoder/market-mirror at commit `2ffb39f` (2026-11-10), set up per its
+  CONTRIBUTING.md: `git clone`, then `cd backend && uv sync --python 3.12`. No API key needed:
+  the tests mock the model and embedder.
+- Baseline test run: `uv run --no-sync python -m pytest tests claude_cli/tests -q`.
+
+Challenges (2026-11-10):
+
+1. **The suite killed itself at ~50%.** pytest exited with code 15 and no summary line, twice.
+   A `-v` run showed the last test started was
+   `tests/test_production_hardening.py::test_sigterm_stops_server_chains_previous_handler_and_kills_simulations`,
+   which sends SIGTERM to its own process; on Windows that terminates pytest outright.
+   Workaround: `--deselect` that one test. Result: **868 passed, 34 failed, 15 skipped,
+   1 deselected** in 4m51s, before touching any code.
+2. **The 34 failures are Windows-only, and 5 are in the file I need to change**
+   (`claude_cli/tests/test_providers.py`, 5 failed / 4 passed). Four fail at
+   `providers.py:230` in `write_config` with `PermissionError: [WinError 32] The process cannot
+   access the file because it is being used by another process` (it replaces a temp `.env`
+   file that is still open, which POSIX allows and Windows does not); the fifth shells out to
+   `bash mm.sh` and gets exit 49. The rest (gateway fake CLIs, process liveness, SIGTERM) are
+   the same POSIX assumptions.
+3. **Tried WSL Ubuntu for a clean Linux baseline:** uv installed fine, but `uv sync` on Linux
+   pulls CUDA torch wheels, and the WSL disk went read-only mid-extraction
+   (`Read-only file system (os error 30)`, then `df: Input/output error`). Status: pending repair.
 
 **Steps to Reproduce**
 
-1. [Step 1]
-2. [Step 2]
-3. [Observed result]
+1. `git clone https://github.com/DarkWorldCoder/market-mirror && cd market-mirror/backend && uv sync --python 3.12`
+2. `uv run --no-sync python claude_cli/providers.py list | python -c "import json,sys;d=json.load(sys.stdin);print(len(d),[k for k,v in d.items() if 'privacy' in v])"`
+   (counts the catalog entries and lists any that carry a `privacy` key)
+3. `uv run --no-sync python -c "import sys,json;sys.path.insert(0,'claude_cli');import providers;print(json.dumps(providers.check(None,settings={'LLM_BASE_URL':'http://127.0.0.1:11434/v1','LLM_PROVIDER':'ollama'})))"`
+   (runs `check()` against the default Ollama URL with nothing listening, so no key or network is needed)
+4. `grep -niE "retention|DPA|data processing agreement" ../PRIVACY.md ../docs/PROVIDERS_AND_SCALE.md`
+5. Observed: 25 entries, none with `privacy`; `check()` output has no privacy field; one
+   generic retention sentence in the docs.
 
 **Reproduction Evidence**
 
-- **Commit showing reproduction:** [link to commit in your fork]
-- **Screenshots/logs:** [if applicable]
-- **My findings:** [what you discovered during reproduction; an
-  honest, evidenced cannot-reproduce that led you to re-pick or ask
-  the maintainer belongs here and costs you nothing]
+- **Commit showing reproduction:** upstream `main` at
+  https://github.com/DarkWorldCoder/market-mirror/commit/2ffb39f (no fork yet; this is a
+  missing-feature issue, so the reproduction is the current state of `main`, and my fork
+  branch will start from this commit).
+- **Screenshots/logs:** output of steps 2-4 on 2026-11-10, Windows 11:
+
+  ```text
+  ## provider list: does any CATALOG entry carry a privacy field?
+  25 entries
+  entries with privacy: []
+  anthropic: {'label': 'Claude API', 'base_url': 'https://api.anthropic.com/v1', 'key_required': True,
+   'guide': 'https://platform.claude.com/docs/en/get-api-key', 'key_url': 'https://platform.claude.com/settings/keys',
+   'key_env': 'ANTHROPIC_API_KEY', 'default_model': 'claude-haiku-4-5'}
+
+  ## provider check (ollama default URL, nothing listening)
+  {"status": "unreachable_or_invalid_response", "inference_tested": false}
+
+  ## docs mentioning retention/DPA
+  PRIVACY.md:23:  privacy policy and data-retention terms apply to those prompts.
+  ```
+- **My findings:** the gap reproduces exactly as the issue describes. The real surprise was
+  the baseline: on Windows the suite needs one SIGTERM test deselected to finish, and it
+  shows 34 pre-existing failures, 5 of them in `test_providers.py` (WinError 32 in
+  `write_config`). My new test must therefore exercise `check()` through its `settings=`
+  argument and not through `write_config`, or it would fail on Windows for unrelated reasons.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code, used to run the setup, the reproduction commands, and the baseline suite
+  (verbose, then with `--deselect`); WSL Ubuntu as an attempted Linux baseline.
+- What it produced: the before-evidence excerpt above, plus a baseline of 868 passed,
+  34 failed, 15 skipped, 1 deselected.
+- Difficulties: pytest killed itself (exit 15) at about 50% twice before a `-v` run pinned it
+  to the SIGTERM test; WSL's disk went read-only while `uv sync` was extracting CUDA torch
+  wheels.
+- What changed: I deselect the SIGTERM test on Windows and compare before/after on that same
+  baseline instead of chasing a green Linux run; I will design the new test to avoid
+  `write_config`.
 
 ---
 
@@ -192,67 +265,118 @@ and how you solved them, or that none came up.]
 
 **Analysis**
 
-[Your analysis of the root cause: what is causing the issue, traced
-to the files and functions involved.]
+This is missing content, not broken logic. `CATALOG` in `backend/claude_cli/providers.py`
+holds, per provider, `label`, `base_url`, `key_required`, `guide`, `key_url` and `key_env`;
+the 12 hosted APIs in `API_GUIDES` are copied into it by the loop over `API_GUIDES.items()`
+that builds each entry from `model_pool.API_PROVIDERS`. No field carries a privacy link, so
+`check()` (which returns status and models only) has nothing to show. The configured provider
+is already known to `check()`: `write_config` saves the `CATALOG` key as
+`MARKET_MIRROR_PROVIDER` in `.env`, which `check()` reads through `read_env(root)` or its
+`settings=` argument. On the docs side, PRIVACY.md:23 defers to "that provider's own privacy
+policy" without saying what those policies are.
 
 **Proposed Solution**
 
-[High-level description of your fix approach, and what you are
-deliberately NOT changing.]
+Add the data and surface it in one place each:
+
+- a `privacy` link on every `CATALOG` entry (for the 12 `API_GUIDES` providers, a small
+  `PRIVACY_LINKS` dict read by the existing loop, so the loop stays the single place
+  those entries are built);
+- `check()` adds `"privacy": <link>` to its result for the configured provider, on success and
+  on error paths, so you see it even when the endpoint is down;
+- one "Provider data handling" table in the docs file the maintainer picks, every row with a
+  source link and a checked-on date; gateways point to the CLI vendor's consumer terms;
+  Ollama and LM Studio are marked on-device; "Another OpenAI-compatible server" gets "your
+  provider's terms".
+
+Deliberately NOT changing: the Windows-only failures in `write_config` and the test suite
+(a separate issue, and one I may report); `configure()`'s flow and prompts; `model_pool.py`;
+the structure of `CATALOG`; and no legal interpretation in the table: facts and links only.
 
 **Implementation Plan**
 
-1. [Modify file X to do Y]
-2. [Add or change Z]
-3. [Update tests]
+1. `backend/claude_cli/providers.py`: add a `privacy` URL to each static `CATALOG` entry; add
+   a `PRIVACY_LINKS` dict next to `API_GUIDES` and set `"privacy"` in the loop that builds
+   those entries.
+2. `backend/claude_cli/providers.py` `check()`: look up
+   `CATALOG.get(env.get("MARKET_MIRROR_PROVIDER") or env.get("LLM_GATEWAY") or "", {}).get("privacy")`
+   and include it in every returned dict.
+3. `backend/claude_cli/tests/test_providers.py`: a test that every `CATALOG` entry has a
+   `privacy` key (an https URL, or empty only for `compatible`), and a test that `check()` with
+   `settings={"MARKET_MIRROR_PROVIDER": "anthropic", ...}` and a fake opener returns the
+   Anthropic privacy link on both the reachable and the HTTP-error paths.
+4. Docs: the "Provider data handling" table in `docs/PROVIDERS_AND_SCALE.md` (or `PRIVACY.md`
+   if the maintainer prefers), plus a one-line pointer to it from PRIVACY.md:23.
+
+Deviations: none yet.
 
 [Record deviations here as they happen: what changed mid-build and
 why. A recorded deviation is honest work; silent drift is not.]
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code, used to trace `check()`, `write_config()` and `status()` to find how
+  `check()` can know which provider is configured.
+- What it produced: the finding that `MARKET_MIRROR_PROVIDER` already holds the `CATALOG` key,
+  so the lookup needs no new config, and the 4-step plan above.
+- Difficulties: my claim comment said "print it in `provider check`", but `check()` returns a
+  dict that `main()` prints as JSON, so the "print" is really a new field in that JSON.
+- What changed: the plan states "add a field to `check()`'s result" explicitly, so the PR
+  description can't overstate it as a new printed line.
 
 ---
 
 ## Testing Strategy
 
-[What observable checks prove the fix: your reproduction steps re-run
-against the built change (before and after), and the repo's own test
-suite or checks with the outcome shown. "Tests pass" with nothing
-observable named is not a strategy.]
+1. **Reproduction re-run (before/after):** run Reproduction steps 2-3 on the branch. Before:
+   `25 []` and `{"status": "unreachable_or_invalid_response", "inference_tested": false}`.
+   After: all 25 entry names listed as having `privacy`, and step 3 re-run with
+   `'MARKET_MIRROR_PROVIDER':'ollama'` added shows a `"privacy"` field in the `check()` JSON.
+2. **New tests:** `uv run --no-sync python -m pytest claude_cli/tests/test_providers.py -q`.
+   Before: 5 failed, 4 passed (all 5 are WinError 32 or bash failures in `write_config`).
+   After: the same 5 failures, unchanged, plus my new tests passing.
+3. **Full suite, same command as the baseline:**
+   `uv run --no-sync python -m pytest tests claude_cli/tests -q --deselect tests/test_production_hardening.py::test_sigterm_stops_server_chains_previous_handler_and_kills_simulations`.
+   Baseline: 868 passed, 34 failed, 15 skipped. Pass condition: the same 34 failures by name
+   (diffed from the `FAILED` lines) and the passed count up by exactly the number of new tests.
+4. **Docs check:** every table row has a source link and a checked-on date; I will open each
+   source link once to confirm that it resolves.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code, used to turn the baseline run into before/after numbers and
+  a named-failure diff.
+- What it produced: the 4 checks above with their baseline numbers filled in.
+- Difficulties: on a baseline with 34 red tests, "tests pass" means nothing, so I needed
+  a comparison that a new failure couldn't hide in.
+- What changed: the pass condition is "the same 34 failures by name", not a green suite, and
+  the new tests deliberately avoid `write_config`.
 
 ---
 
 ## Implementation Notes
 
-[A running log, added to as you work. Date each entry. What you
-built, decisions you made when you made them, wrong turns included.]
+**2026-11-10: scout and selection**
 
-**[Date]**
+Installed issue-scout, wrote the strategy, and ran scan 1 (1 accept), patched the
+"created < 3 days" filter, then ran scan 2 (3 accepts). I chose market-mirror#164 over
+openslop#1220 because it is testable locally with no LLM key, and over the two aws issues
+because their fix lives in another repo. The claim comment is posted and asks where the table
+should go.
 
-[Entry]
+**2026-11-10: setup and the Windows baseline**
 
-**[Date]**
-
-[Entry]
+Wrong turn: I assumed the suite was slow, but it was killing itself. A `-v` run found the SIGTERM
+test. I tried WSL for a clean Linux run and the WSL disk went read-only, so I decided to keep
+the Windows baseline (868/34/15) and compare failures by name. Decision: the new tests go through
+`check(settings=...)` so they don't depend on `write_config`, which fails on Windows.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code for the commands, and this log written as I worked.
+- What it produced: two dated entries tied to the selection and the baseline decisions.
+- Difficulties: none met with the log itself; the difficulties were in the work it records.
+- What changed: nothing.
 
 ---
 
