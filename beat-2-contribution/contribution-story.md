@@ -101,8 +101,9 @@ exclusions (full suite red on main on Windows, those 5 tests, Playwright tests I
 `docs/provider-privacy-164` all four checks passed, then the gate stopped: pr-precheck "could not
 complete its run (claude exited 1 ... 401)". That was a fail-closed refusal, not a judgment. Run
 in-session as a dry run, my pr-precheck rejected on `standards-met` for the missing PR-template
-heading and checklist; I fixed the draft. What remains: a real gate pass after `claude` login,
-then the PR from my fork.
+heading and checklist; I fixed the draft. After I logged in again, the real gate first blocked on
+`diff-matches-plan [unclear]: plan.md absent`; with `plan.md` written at the clone root it passed,
+and PR #195 went out through the gate hook (see Unit 8 and the Pull Request section).
 
 **Unit 8 (2026-11-11): PR-monitor and playbook; a bot review in the first minute, a draft I rewrote**
 
@@ -137,7 +138,7 @@ It fits because it is a Python CLI for LLM providers, the exact kind of tooling 
 and the change is a docs table plus a small `privacy` field in `CATALOG` in
 `backend/claude_cli/providers.py` with a pytest test, which I can verify locally (the suite mocks
 the model, no API key needed). I picked it over openslop#1220 because verifying that one needs a
-live LLM run. The honest cost: `CATALOG` has about 26 entries, roughly 15 of them hosted APIs whose
+live LLM run. The honest cost: `CATALOG` has 25 entries, roughly 15 of them hosted APIs whose
 retention, DPA and region terms I have to research from each provider's own pages, so this is
 more reading than coding. I want to learn to land a small, sourced change in someone else's repo.
 
@@ -162,7 +163,8 @@ week", a promised date that broke my own voice guide; see the Unit 6 entry).
   already claimed by open PRs; my `sort=updated` in the API workaround made the 90-day filter
   a no-op; the rubric accepted aws#543/#541 although their fix lives in another repo.
 - What changed: added a "drop issues created < 3 days ago" filter and went back to best-match
-  order; drafted a `fix-is-in-this-repo` required check (pending a unit-1 harness regression run).
+  order; drafted a `fix-is-in-this-repo` required check in my scan notes but have not applied it
+  to the rubric yet (the rubric patch I did apply and regress, 20/20, was unit 6's `scope-feasible`).
 
 ---
 
@@ -471,8 +473,8 @@ form run (with a `guide`/`privacy` control) and edited the claim on GitHub to dr
 chose not to keep an "Edited:" note, since GitHub shows its own edit marker and history, and I
 also dropped the AI-disclosure sentence from the claim; the repo states no AI policy, and the
 disclosure goes in the PR. Also applied the unit-6 rubric patch (`scope-feasible` + difficulty
-note) to my scout. Its unit-1 regression run is pending for the same reason as the guard:
-`claude -p` returns 401 until I log in again.
+note) to my scout. Its unit-1 regression run had to wait for the same reason as the guard
+(`claude -p` returned 401); after I logged in again it scored 20/20 against the gold labels.
 
 **2026-11-10: research split, then the build**
 
