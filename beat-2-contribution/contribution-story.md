@@ -379,6 +379,17 @@ Deviations (recorded 2026-11-10 while building, commit `841265b`):
    region vs inference deployment scope; Claude Code's safety-review training exception.
    Declined with reasons: an "endpoint differs from catalog" label (new behaviour, not in #164) and
    CodeRabbit's docstring-coverage threshold (not a check this repo states).
+6. **Review round 2 (instructor feedback, 2026-11-11) reverses deviation 2.** A separate
+   `PRIVACY_LINKS` dict was a second structure keyed by the same provider names, which can drift.
+   Each link now lives in its provider's own record: an inline `"privacy"` on the 13 static
+   `CATALOG` entries, and `API_GUIDES` values become `{"guide", "privacy"}` records read with
+   `["privacy"]` (a missing one fails at import). `CATALOG`'s contents are unchanged (the full dict
+   compares equal before and after). Commit `8f70394`.
+7. **Review round 2: the lookup gets a name.** The fallback chain in `check()` becomes
+   `configured_provider(env)` ("which catalog provider these settings were written for"), with its
+   own test, and the tests now say in a comment why they use `check(settings=...)` rather than
+   `write_config` (WinError 32 on Windows). The PR's evidence moves from `python -c` one-liners to
+   the project's own `providers.py check --root` / `providers.py list`.
 
 **Toolkit**
 
@@ -428,6 +439,12 @@ Deviations (recorded 2026-11-10 while building, commit `841265b`):
    suite **870 passed, 35 failed, 15 skipped**, which is exactly 868 + 3 new − 1 flaky, with the
    same 34 failures by name plus the same flake. One run before that died at collection with a
    Windows `0xc000001d` "Illegal instruction" while importing torch; the rerun completed.
+   After review round 2 (`8f70394`, 2026-11-11): provider tests **8 passed, 5 failed**, full suite
+   **871 passed, 35 failed, 15 skipped** (868 + 4 new − 1 flaky), the same 34 by name plus the flake.
+   The whole `CATALOG` dict compares equal before and after the refactor. New CLI-level evidence:
+   `providers.py check --root` on a `.env` with `MARKET_MIRROR_PROVIDER=anthropic` adds
+   `"privacy": "https://www.anthropic.com/legal/privacy"` (main: no field), on a `.env` with
+   `LLM_GATEWAY=gemini` adds the Gemini CLI page, and `providers.py list` goes from 0 to 25 of 25.
 4. Links: all 44 in the table resolve; 41 return 200 to curl, and 3 (openai.com DPA, x.ai DPA,
    OpenAI help article) return 403 to scripts but loaded in a browser.
 5. Also run: CI's syntax lint (`ruff check --select E9,F63,F7,F82 ...`, all checks passed) and
@@ -511,6 +528,20 @@ right about the gateway gap, and about the Gemini DPA I had marked "not stated";
 things outside #164, which I declined. Fixed in `cd9d36b`, re-gated (pass), updated the PR body,
 and replied through the guard.
 
+**2026-11-11: review round 2, from my instructor's feedback**
+
+My first grade (140/250) came from an older commit, but its code notes were fair. Decision: apply
+them as a second review round on the open PR, with the same gate-and-guard path as round 1. I moved
+each privacy link into its provider's own record, so there's no parallel `PRIVACY_LINKS` dict to
+drift. I named the lookup `configured_provider(env)` and tested it on its own, and commented why
+the tests avoid `write_config`. I also swapped the PR's `python -c` evidence for
+`providers.py check --root` / `list`. Then I checked that the refactor changed nothing: the whole
+`CATALOG` compares equal before and after. The gate passed, but the voice-guard **stopped my PR body**
+on my one-sentence disclosure rule, though the same section had passed it before. I cut the
+disclosure to one sentence and it passed. My own slip: a file-write was blocked, so
+`gh pr comment` re-posted the round-1 reply. I edited that comment into the intended round-2 note
+(commit `8f70394`, comment 6806594815).
+
 **Toolkit**
 
 - Tool: Claude Code for the commands, and this log written as I worked.
@@ -555,6 +586,10 @@ After review round 1, I updated it to describe `cd9d36b` and list what I decline
   https://github.com/DarkWorldCoder/market-mirror/pull/195#issuecomment-6790911677
 - 2026-11-11: no human maintainer has commented yet. Checks: CodeRabbit and GitGuardian Security
   Checks both pass. Silence so far is under my 5-quiet-day threshold, so no nudge.
+- 2026-11-11: review round 2 came from my course instructor's grading notes, not the repo: move the
+  privacy link into each provider's record, name the lookup, use the CLI in the evidence, and
+  explain the `check(settings=...)` choice. All four done in `8f70394`, with the PR body updated and a
+  note posted: https://github.com/DarkWorldCoder/market-mirror/pull/195#issuecomment-6806594815
 
 **Status:** Awaiting maintainer review (open, mergeable, 2 checks passing; 2026-11-11).
 
