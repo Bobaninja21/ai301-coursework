@@ -42,7 +42,7 @@ My plan lived only in my course repo, not in the clone. I wrote `plan.md` at the
 2026-11-11 12:39 [manual] pass
 ```
 
-**The PR and the review that changed my fix.** PR #195 went out through both hooks. CodeRabbit reviewed within minutes and raised 7 findings. I verified each against the code and the providers' pages before touching anything. It was right about the gateway gap I had deliberately dropped:
+**The PR and the review that changed my fix.** The result: PR #195 opened at 23:52 PT on 2026-11-10 through both hooks, and it is open and mergeable today. CodeRabbit reviewed within six minutes (PR opened 07:52:47 UTC, review 07:58:13 UTC) and raised 7 findings. I verified each against the code and the providers' pages before touching anything. It was right about the gateway gap I had deliberately dropped:
 
 > Line 296: Update the privacy lookup in check() to resolve recognized login gateways from LLM_GATEWAY when MARKET_MIRROR_PROVIDER is absent, including mapping gemini to gemini_cli...
 
@@ -50,7 +50,7 @@ I had dropped the `LLM_GATEWAY` fallback because gateway names collide with cata
 
 > providers.py, gateway privacy links: fixed. You're right that `mm.sh gateway start` drops `MARKET_MIRROR_PROVIDER` (line 208), so gateway users got no link... New test `test_provider_check_maps_login_gateways_to_their_catalog_entry` fails with `KeyError: 'privacy'` without the fix.
 
-**The refactor.** My instructor's feedback asked me to move each link into its provider's own record instead of a parallel `PRIVACY_LINKS` dict that could drift, and to name the lookup. I did it in `8f70394`; the whole `CATALOG` compares equal before and after. CodeRabbit's follow-up review on the refactor raised three more points, which I have not yet addressed.
+**The refactor.** My instructor's feedback asked me to move each link into its provider's own record instead of a parallel `PRIVACY_LINKS` dict that could drift, and to name the lookup. I did it in `8f70394`; the whole `CATALOG` compares equal before and after (`25 entries both sides; CATALOG equal before and after: True`). CodeRabbit's follow-up review on the refactor raised three more points, which I have not yet addressed.
 
 ## Limitations and what's next
 
